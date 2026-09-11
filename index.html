@@ -222,16 +222,58 @@ const VIEW_H = canvas.height;
 const TILE = 40;
 
 /* ============================================================
-   AUDIO ENGINE (synth retro SFX, no external files)
+   AUDIO ENGINE
+   Plays ElevenLabs-generated SFX (assets/audio/sfx/*.mp3) when available,
+   and falls back to the original synth-generated retro SFX otherwise.
 ============================================================ */
 const Audio_ = {
   ctx:null,
   enabled:true,
+  buffers:{},
+  files:{
+    jump:'assets/audio/sfx/jump.mp3',
+    bigJump:'assets/audio/sfx/bigjump.mp3',
+    coin:'assets/audio/sfx/coin.mp3',
+    stomp:'assets/audio/sfx/stomp.mp3',
+    kick:'assets/audio/sfx/kick.mp3',
+    bump:'assets/audio/sfx/bump.mp3',
+    brk:'assets/audio/sfx/brk.mp3',
+    powerup:'assets/audio/sfx/powerup.mp3',
+    fireball:'assets/audio/sfx/fireball.mp3',
+    hurt:'assets/audio/sfx/hurt.mp3',
+    death:'assets/audio/sfx/death.mp3',
+    flag:'assets/audio/sfx/flag.mp3',
+    star:'assets/audio/sfx/star.mp3',
+    pause:'assets/audio/sfx/pause.mp3',
+  },
   init(){
     if(this.ctx) return;
     try{
       this.ctx = new (window.AudioContext||window.webkitAudioContext)();
+      this.preload();
     }catch(e){ this.enabled=false; }
+  },
+  async preload(){
+    if(!this.ctx) return;
+    await Promise.all(Object.entries(this.files).map(async ([name,url])=>{
+      try{
+        const res = await fetch(url);
+        if(!res.ok) return;
+        const arr = await res.arrayBuffer();
+        this.buffers[name] = await this.ctx.decodeAudioData(arr);
+      }catch(e){ /* not generated yet - keep using the synth fallback */ }
+    }));
+  },
+  playClip(name,vol){
+    const buf = this.buffers[name];
+    if(!buf || !this.ctx) return false;
+    const src = this.ctx.createBufferSource();
+    const gain = this.ctx.createGain();
+    gain.gain.value = vol!=null?vol:0.6;
+    src.buffer = buf;
+    src.connect(gain).connect(this.ctx.destination);
+    src.start(this.ctx.currentTime);
+    return true;
   },
   tone(freq,dur,type,vol,slide){
     if(!this.enabled) return;
@@ -269,20 +311,20 @@ const Audio_ = {
     src.connect(filt).connect(gain).connect(this.ctx.destination);
     src.start(t0);
   },
-  jump(){ this.tone(420,0.16,'square',0.14,260); },
-  bigJump(){ this.tone(300,0.22,'square',0.16,420); },
-  coin(){ this.tone(990,0.09,'square',0.16,0); setTimeout(()=>this.tone(1500,0.14,'square',0.14,0),70); },
-  stomp(){ this.noise(0.09,0.22,500); },
-  kick(){ this.tone(150,0.1,'square',0.2,-60); },
-  bump(){ this.tone(220,0.07,'square',0.18,-40); },
-  brk(){ this.noise(0.18,0.25,2200); },
-  powerup(){ [523,659,784,1046].forEach((f,i)=>setTimeout(()=>this.tone(f,0.14,'square',0.16,0),i*90)); },
-  fireball(){ this.tone(700,0.08,'sawtooth',0.1,-200); },
-  hurt(){ this.tone(200,0.3,'sawtooth',0.2,-140); },
-  death(){ [500,420,340,260,180].forEach((f,i)=>setTimeout(()=>this.tone(f,0.18,'triangle',0.18,0),i*130)); },
-  flag(){ [400,500,600,700,800,900].forEach((f,i)=>setTimeout(()=>this.tone(f,0.09,'square',0.13,0),i*60)); },
-  star(){ this.tone(1200,0.05,'square',0.08,0); },
-  pause(){ this.tone(500,0.06,'sine',0.1,120); },
+  jump(){ if(this.playClip('jump',0.5)) return; this.tone(420,0.16,'square',0.14,260); },
+  bigJump(){ if(this.playClip('bigJump',0.55)) return; this.tone(300,0.22,'square',0.16,420); },
+  coin(){ if(this.playClip('coin',0.55)) return; this.tone(990,0.09,'square',0.16,0); setTimeout(()=>this.tone(1500,0.14,'square',0.14,0),70); },
+  stomp(){ if(this.playClip('stomp',0.6)) return; this.noise(0.09,0.22,500); },
+  kick(){ if(this.playClip('kick',0.6)) return; this.tone(150,0.1,'square',0.2,-60); },
+  bump(){ if(this.playClip('bump',0.5)) return; this.tone(220,0.07,'square',0.18,-40); },
+  brk(){ if(this.playClip('brk',0.6)) return; this.noise(0.18,0.25,2200); },
+  powerup(){ if(this.playClip('powerup',0.55)) return; [523,659,784,1046].forEach((f,i)=>setTimeout(()=>this.tone(f,0.14,'square',0.16,0),i*90)); },
+  fireball(){ if(this.playClip('fireball',0.45)) return; this.tone(700,0.08,'sawtooth',0.1,-200); },
+  hurt(){ if(this.playClip('hurt',0.55)) return; this.tone(200,0.3,'sawtooth',0.2,-140); },
+  death(){ if(this.playClip('death',0.6)) return; [500,420,340,260,180].forEach((f,i)=>setTimeout(()=>this.tone(f,0.18,'triangle',0.18,0),i*130)); },
+  flag(){ if(this.playClip('flag',0.55)) return; [400,500,600,700,800,900].forEach((f,i)=>setTimeout(()=>this.tone(f,0.09,'square',0.13,0),i*60)); },
+  star(){ if(this.playClip('star',0.45)) return; this.tone(1200,0.05,'square',0.08,0); },
+  pause(){ if(this.playClip('pause',0.45)) return; this.tone(500,0.06,'sine',0.1,120); },
 };
 
 /* ============================================================
