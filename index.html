@@ -72,6 +72,30 @@
     border:1px solid rgba(2,216,220,.4);
     max-width:120px;
   }
+  .name-entry{
+    position:absolute;left:50%;top:452px;transform:translateX(-50%);
+    display:flex;flex-direction:column;align-items:center;gap:4px;
+    z-index:5;
+  }
+  .name-entry label{
+    font-size:10px;letter-spacing:2px;opacity:.85;text-transform:uppercase;
+    color:#fff;text-shadow:1px 1px 2px rgba(0,0,0,.7);
+  }
+  #playerNameInput{
+    padding:8px 14px;width:200px;text-align:center;
+    font-size:14px;font-family:inherit;font-weight:700;
+    border:2px solid var(--cosmic-cyan);border-radius:8px;
+    background:rgba(10,10,30,.75);color:#fff;
+    box-shadow:0 4px 0 rgba(0,0,0,.35);
+  }
+  #playerNameInput::placeholder{color:rgba(255,255,255,.5);}
+  #playerNameInput:focus{outline:3px solid var(--cosmic-orange);}
+  #playerNameInput.shake{animation:nameShake .3s ease;}
+  @keyframes nameShake{
+    0%,100%{transform:translateX(-50%);}
+    25%{transform:translateX(calc(-50% - 6px));}
+    75%{transform:translateX(calc(-50% + 6px));}
+  }
   .start-btn{
     margin-top:6px;
     background:linear-gradient(180deg,#5eeaef,var(--cosmic-cyan));
@@ -134,6 +158,10 @@
     <div class="overlay" id="titleScreen">
       <h1 class="sr-only">SUPER PIXEL QUEST</h1>
       <div class="sr-only">A Retro Platform Adventure</div>
+      <div class="name-entry">
+        <label for="playerNameInput">Enter your name</label>
+        <input type="text" id="playerNameInput" maxlength="20" autocomplete="off" placeholder="e.g. Mario">
+      </div>
       <button class="start-btn" id="startBtn">START</button>
       <div class="controls-box">
         ◀ ▶ / A D — Move &nbsp; | &nbsp; SPACE — Jump (hold for higher) &nbsp; | &nbsp;<br>
@@ -163,9 +191,31 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 (function(){
 "use strict";
+
+/* ============================================================
+   SUPABASE (score recording)
+============================================================ */
+const SUPABASE_URL = 'https://lqihnvuqidjdsdwdxpow.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable__vthWIJM6WAMvYvVZxwAVw_6ve7YwsI';
+let supabaseClient = null;
+try{
+  if(window.supabase && window.supabase.createClient){
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+  }
+}catch(e){ console.error('Supabase init failed:', e); }
+
+let playerName = '';
+
+async function submitScore(level, score){
+  if(!supabaseClient || !playerName) return;
+  try{
+    await supabaseClient.from('game_scores').insert({ player_name: playerName, level, score });
+  }catch(e){ console.error('Score submit failed:', e); }
+}
 
 /* ============================================================
    CANVAS / GLOBAL SETUP
@@ -745,13 +795,27 @@ const Game = {
   world:'1-1',
   lastTS:0,
   init(){
-    document.getElementById('startBtn').addEventListener('click',()=>this.startGame());
+    document.getElementById('startBtn').addEventListener('click',()=>this.tryStartGame());
     document.getElementById('retryBtn').addEventListener('click',()=>this.restartAll());
     document.getElementById('againBtn').addEventListener('click',()=>this.restartAll());
+    document.getElementById('playerNameInput').addEventListener('keydown',e=>{
+      if(e.key==='Enter') this.tryStartGame();
+    });
     window.addEventListener('keydown',e=>{
-      if(this.state==='title' && (e.key===' '||e.key==='Enter')) this.startGame();
+      if(this.state==='title' && e.key===' ' ) this.tryStartGame();
     });
     requestAnimationFrame(this.loop.bind(this));
+  },
+  tryStartGame(){
+    const nameInput = document.getElementById('playerNameInput');
+    const name = nameInput.value.trim();
+    if(!name){
+      nameInput.focus();
+      nameInput.classList.remove('shake'); void nameInput.offsetWidth; nameInput.classList.add('shake');
+      return;
+    }
+    playerName = name.slice(0,20);
+    this.startGame();
   },
   startGame(){
     Audio_.init();
@@ -773,6 +837,7 @@ const Game = {
       this.state='gameover';
       document.getElementById('finalScoreLabel').textContent = 'Score: '+this.score;
       document.getElementById('gameOverScreen').classList.remove('hidden');
+      submitScore(this.world, this.score);
     } else {
       Player.reset();
       Camera.x = 0;
@@ -782,6 +847,7 @@ const Game = {
     this.state='win';
     document.getElementById('clearScoreLabel').textContent = 'Score: '+this.score;
     document.getElementById('winScreen').classList.remove('hidden');
+    submitScore(this.world, this.score);
   },
   loop(ts){
     let dt = (ts-this.lastTS)/1000;
