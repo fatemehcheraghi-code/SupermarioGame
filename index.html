@@ -1540,7 +1540,7 @@ function drawPlayer(){
   if(!img.complete || img.naturalWidth===0) return; // sprite not decoded yet
 
   const feetY = Player.y + 46; // shared collision-bottom invariant regardless of form
-  const dispH = (Player.form==='small' ? 58 : 89);
+  const dispH = (Player.form==='small' ? 72 : 110);
   const dispW = img.naturalWidth/img.naturalHeight*dispH;
   const cx = Player.x + Player.w/2;
 
@@ -1552,7 +1552,7 @@ function drawPlayer(){
     ctx.filter = `hue-rotate(${hue}deg) saturate(1.7) brightness(1.1)`;
   }
   ctx.translate(cx,0);
-  ctx.scale(Player.facing,1);
+  ctx.scale(-Player.facing,1); // source art faces left, so invert to align with the facing convention
   ctx.drawImage(img, -dispW/2, feetY-dispH, dispW, dispH);
   ctx.restore();
 }
