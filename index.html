@@ -245,7 +245,13 @@ const Audio_ = {
     flag:'assets/audio/sfx/flag.mp3',
     star:'assets/audio/sfx/star.mp3',
     pause:'assets/audio/sfx/pause.mp3',
+    welcome:'assets/audio/sfx/welcome.mp3',
   },
+  musicFiles:{
+    title:'assets/audio/music/title-theme.mp3',
+  },
+  musicBuffers:{},
+  musicSource:null,
   init(){
     if(this.ctx) return;
     try{
@@ -263,6 +269,14 @@ const Audio_ = {
         this.buffers[name] = await this.ctx.decodeAudioData(arr);
       }catch(e){ /* not generated yet - keep using the synth fallback */ }
     }));
+    await Promise.all(Object.entries(this.musicFiles).map(async ([name,url])=>{
+      try{
+        const res = await fetch(url);
+        if(!res.ok) return;
+        const arr = await res.arrayBuffer();
+        this.musicBuffers[name] = await this.ctx.decodeAudioData(arr);
+      }catch(e){ /* not generated yet */ }
+    }));
   },
   playClip(name,vol){
     const buf = this.buffers[name];
@@ -274,6 +288,27 @@ const Audio_ = {
     src.connect(gain).connect(this.ctx.destination);
     src.start(this.ctx.currentTime);
     return true;
+  },
+  playMusic(name,vol){
+    if(!this.ctx) return false;
+    const buf = this.musicBuffers[name];
+    if(!buf) return false;
+    this.stopMusic();
+    const src = this.ctx.createBufferSource();
+    const gain = this.ctx.createGain();
+    src.buffer = buf;
+    src.loop = true;
+    gain.gain.value = vol!=null?vol:0.35;
+    src.connect(gain).connect(this.ctx.destination);
+    src.start(this.ctx.currentTime);
+    this.musicSource = src;
+    return true;
+  },
+  stopMusic(){
+    if(this.musicSource){
+      try{ this.musicSource.stop(); }catch(e){}
+      this.musicSource = null;
+    }
   },
   tone(freq,dur,type,vol,slide){
     if(!this.enabled) return;
@@ -325,6 +360,7 @@ const Audio_ = {
   flag(){ if(this.playClip('flag',0.55)) return; [400,500,600,700,800,900].forEach((f,i)=>setTimeout(()=>this.tone(f,0.09,'square',0.13,0),i*60)); },
   star(){ if(this.playClip('star',0.45)) return; this.tone(1200,0.05,'square',0.08,0); },
   pause(){ if(this.playClip('pause',0.45)) return; this.tone(500,0.06,'sine',0.1,120); },
+  welcome(){ if(this.playClip('welcome',0.5)) return; [392,494,587,784].forEach((f,i)=>setTimeout(()=>this.tone(f,0.16,'triangle',0.14,0),i*110)); },
 };
 
 /* ============================================================
@@ -824,6 +860,14 @@ const Game = {
     document.getElementById('startBtn').addEventListener('click',()=>this.startGame());
     document.getElementById('retryBtn').addEventListener('click',()=>this.restartAll());
     document.getElementById('againBtn').addEventListener('click',()=>this.restartAll());
+    // Browsers only allow audio after a user gesture, so kick off the title
+    // screen's welcome jingle + looping theme on the first click/keypress.
+    const beginTitleAudio = ()=>{
+      Audio_.init();
+      if(this.state==='title'){ Audio_.welcome(); Audio_.playMusic('title',0.3); }
+    };
+    window.addEventListener('pointerdown',beginTitleAudio,{once:true});
+    window.addEventListener('keydown',beginTitleAudio,{once:true});
     window.addEventListener('keydown',e=>{
       if(this.state==='title' && (e.key===' '||e.key==='Enter')) this.startGame();
     });
@@ -831,6 +875,7 @@ const Game = {
   },
   startGame(){
     Audio_.init();
+    Audio_.stopMusic();
     document.getElementById('titleScreen').classList.add('hidden');
     this.state='playing';
     this.lastTS=performance.now();

@@ -30,6 +30,7 @@ const SFX = {
   flag:    { text: 'Retro 8-bit video game level complete flagpole sound effect, ascending cheerful chiptune scale, six notes rising', duration_seconds: 0.7 },
   star:    { text: 'Retro 8-bit video game sparkle star pickup sound effect, short high bright chiptune twinkle', duration_seconds: 0.5 },
   pause:   { text: 'Retro 8-bit video game pause menu sound effect, short soft synth blip rising in pitch', duration_seconds: 0.5 },
+  welcome: { text: 'Retro 8-bit video game title screen welcome jingle, short cheerful chiptune fanfare, upbeat and inviting', duration_seconds: 1.5 },
 };
 
 async function exists(p) {
